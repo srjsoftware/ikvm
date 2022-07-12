@@ -23,6 +23,7 @@
 */
 
 using System;
+using System.Net;
 
 namespace IKVM.Java.Externs.sun.nio.ch
 {
@@ -42,7 +43,7 @@ namespace IKVM.Java.Externs.sun.nio.ch
 #else
             try
             {
-                fd.getSocket().Connect(new System.Net.IPEndPoint(System.Net.IPAddress.Any, 0));
+                fd.getSocket().Connect(new IPEndPoint(IPAddress.Any, 0));
                 Runtime.Java.Externs.sun.nio.ch.Net.setConnectionReset(fd.getSocket(), false);
             }
             catch (System.Net.Sockets.SocketException e)
@@ -63,11 +64,11 @@ namespace IKVM.Java.Externs.sun.nio.ch
 #else
             var impl = (global::sun.nio.ch.DatagramChannelImpl)self;
             var remoteAddress = impl.remoteAddress();
-            System.Net.EndPoint remoteEP;
+            EndPoint remoteEP;
             if (fd.getSocket().AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
-                remoteEP = new System.Net.IPEndPoint(System.Net.IPAddress.IPv6Any, 0);
+                remoteEP = new IPEndPoint(IPAddress.IPv6Any, 0);
             else
-                remoteEP = new System.Net.IPEndPoint(0, 0);
+                remoteEP = new IPEndPoint(0, 0);
 
             global::java.net.InetSocketAddress addr;
             int length;
