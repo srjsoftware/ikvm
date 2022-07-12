@@ -1,35 +1,44 @@
-/*
-  Copyright (C) 2011 Jeroen Frijters
+package sun.nio.ch;
 
-  This software is provided 'as-is', without any express or implied
-  warranty.  In no event will the authors be held liable for any damages
-  arising from the use of this software.
-
-  Permission is granted to anyone to use this software for any purpose,
-  including commercial applications, and to alter it and redistribute it
-  freely, subject to the following restrictions:
-
-  1. The origin of this software must not be misrepresented; you must not
-     claim that you wrote the original software. If you use this software
-     in a product, an acknowledgment in the product documentation would be
-     appreciated but is not required.
-  2. Altered source versions must be plainly marked as such, and must not be
-     misrepresented as being the original software.
-  3. This notice may not be removed or altered from any source distribution.
-
-  Jeroen Frijters
-  jeroen@frijters.net
-  
-*/
-
-package sun.nio.fs;
-
+import java.lang.AssertionError;
+import java.lang.IllegalAccessException;
+import java.lang.InstantiationException;
 import java.nio.file.spi.FileSystemProvider;
 
-public class DefaultFileSystemProvider
+/**
+ * Creates this platform's default file system provider.
+ */
+final class DefaultFileSystemProvider
 {
-    public static FileSystemProvider create()
+
+    @SuppressWarnings("unchecked")
+    private final static FileSystemProvider createProvider(String cn)
     {
-        return new NetFileSystemProvider();
+
+        Class<FileSystemProvider> c;
+
+        try
+        {
+            c = (Class<FileSystemProvider>)Class.forName(cn);
+        }
+        catch (ClassNotFoundException e)
+        {
+            throw new AssertionError(e);
+        }
+
+        try
+        {
+            return c.newInstance();
+        }
+        catch (IllegalAccessException | InstantiationException e)
+        {
+            throw new AssertionError(e);
+        }
     }
+
+    public final static FileSystemProvider create()
+    {
+        return createProvider("ikvm.nio.fs.NetFileSystemProvider");
+    }
+
 }
