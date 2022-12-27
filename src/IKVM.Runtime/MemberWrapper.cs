@@ -1382,72 +1382,67 @@ namespace IKVM.Internal
         }
 
 #if !IMPORTER && !EXPORTER
+
         internal static FieldWrapper FromField(java.lang.reflect.Field field)
-        {
-#if FIRST_PASS
-            return null;
-#else
-            int slot = field._slot();
-            if (slot == -1)
-            {
-                // it's a Field created by Unsafe.objectFieldOffset(Class,String) so we must resolve based on the name
-                foreach (FieldWrapper fw in TypeWrapper.FromClass(field.getDeclaringClass()).GetFields())
-                {
-                    if (fw.Name == field.getName())
-                    {
-                        return fw;
-                    }
-                }
-            }
-            return TypeWrapper.FromClass(field.getDeclaringClass()).GetFields()[slot];
-#endif
-        }
-
-        internal object ToField(bool copy)
-        {
-            return ToField(copy, null);
-        }
-
-        internal object ToField(bool copy, int? fieldIndex)
         {
 #if FIRST_PASS
             throw new NotImplementedException();
 #else
-            java.lang.reflect.Field field = reflectionField;
+            int slot = field._slot();
+            if (slot == -1)
+                foreach (var fw in TypeWrapper.FromClass(field.getDeclaringClass()).GetFields())
+                    if (fw.Name == field.getName())
+                        return fw;
+
+            return TypeWrapper.FromClass(field.getDeclaringClass()).GetFields()[slot];
+#endif
+        }
+
+        internal java.lang.reflect.Field ToField(bool copy)
+        {
+            return ToField(copy, null);
+        }
+
+        /// <summary>
+        /// Gets the <see cref="java.lang.reflect.Field"/> object associated with this <see cref="FieldWrapper"/>.
+        /// </summary>
+        /// <param name="copy"></param>
+        /// <param name="fieldIndex"></param>
+        /// <returns></returns>
+        internal java.lang.reflect.Field ToField(bool copy, int? fieldIndex)
+        {
+#if FIRST_PASS
+            throw new NotImplementedException();
+#else
+            var field = reflectionField;
             if (field == null)
             {
-                const Modifiers ReflectionFieldModifiersMask = Modifiers.Public | Modifiers.Private | Modifiers.Protected | Modifiers.Static
-                    | Modifiers.Final | Modifiers.Volatile | Modifiers.Transient | Modifiers.Synthetic | Modifiers.Enum;
+                const Modifiers ReflectionFieldModifiersMask = Modifiers.Public | Modifiers.Private | Modifiers.Protected | Modifiers.Static | Modifiers.Final | Modifiers.Volatile | Modifiers.Transient | Modifiers.Synthetic | Modifiers.Enum;
                 Link();
+
                 field = new java.lang.reflect.Field(
-                    this.DeclaringType.ClassObject,
-                    this.Name,
-                    this.FieldTypeWrapper.EnsureLoadable(this.DeclaringType.GetClassLoader()).ClassObject,
-                    (int)(this.Modifiers & ReflectionFieldModifiersMask) | (this.IsInternal ? 0x40000000 : 0),
-                    fieldIndex ?? Array.IndexOf(this.DeclaringType.GetFields(), this),
-                    this.DeclaringType.GetGenericFieldSignature(this),
+                    DeclaringType.ClassObject,
+                    Name,
+                    FieldTypeWrapper.EnsureLoadable(DeclaringType.GetClassLoader()).ClassObject,
+                    (int)(Modifiers & ReflectionFieldModifiersMask) | (IsInternal ? 0x40000000 : 0),
+                    fieldIndex ?? Array.IndexOf(DeclaringType.GetFields(), this),
+                    DeclaringType.GetGenericFieldSignature(this),
                     null
                 );
             }
-            lock (this)
-            {
-                if (reflectionField == null)
-                {
-                    reflectionField = field;
-                }
-                else
-                {
-                    field = reflectionField;
-                }
-            }
+
+            // get latest value
+            field = Interlocked.CompareExchange(ref reflectionField, field, null);
+
+            // user requested a copy
             if (copy)
-            {
                 field = field.copy();
-            }
+
             return field;
-#endif // FIRST_PASS
+#endif
         }
-#endif // !IMPORTER && !EXPORTER
+
+#endif
 
         [System.Security.SecurityCritical]
         internal static FieldWrapper FromCookie(IntPtr cookie)
@@ -1581,23 +1576,14 @@ namespace IKVM.Internal
             }
         }
 
-        internal object GetFieldAccessorJNI()
-        {
-#if FIRST_PASS
-            return null;
-#else
-            if (jniAccessor == null)
-            {
-                Interlocked.CompareExchange(ref jniAccessor, IKVM.Java.Externs.sun.reflect.ReflectionFactory.NewFieldAccessorJNI(this), null);
-            }
-            return jniAccessor;
-#endif
-        }
-
 #if !FIRST_PASS
+
         internal abstract object GetValue(object obj);
+
         internal abstract void SetValue(object obj, object value);
+
 #endif
+
 #endif // !IMPORTER && !EXPORTER
     }
 
@@ -2185,6 +2171,8 @@ namespace IKVM.Internal
             // we can only be invoked on type 2 access stubs (because type 1 access stubs are HideFromReflection), so we know we have a field
             GetField().SetValue(obj, value);
         }
+
 #endif // !IMPORTER && !EXPORTER && !FIRST_PASS
     }
+
 }

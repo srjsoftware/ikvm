@@ -123,16 +123,8 @@ namespace IKVM.Java.Externs.sun.reflect
         {
             // the mask comes from JVM_RECOGNIZED_CLASS_MODIFIERS in src/hotspot/share/vm/prims/jvm.h
             int mods = (int)TypeWrapper.FromClass(clazz).Modifiers & 0x7631;
-            // interface implies abstract
-            mods |= (mods & 0x0200) << 1;
+            mods |= (mods & 0x0200) << 1; // interface implies abstract
             return mods;
-        }
-
-        public static bool checkInternalAccess(global::java.lang.Class currentClass, global::java.lang.Class memberClass)
-        {
-            var current = TypeWrapper.FromClass(currentClass);
-            var member = TypeWrapper.FromClass(memberClass);
-            return member.IsInternal && member.InternalsVisibleTo(current);
         }
 
     }
