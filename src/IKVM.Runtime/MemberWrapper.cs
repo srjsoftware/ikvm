@@ -1414,13 +1414,12 @@ namespace IKVM.Internal
 #if FIRST_PASS
             throw new NotImplementedException();
 #else
-            var field = reflectionField;
-            if (field == null)
+            if (reflectionField == null)
             {
                 const Modifiers ReflectionFieldModifiersMask = Modifiers.Public | Modifiers.Private | Modifiers.Protected | Modifiers.Static | Modifiers.Final | Modifiers.Volatile | Modifiers.Transient | Modifiers.Synthetic | Modifiers.Enum;
                 Link();
 
-                field = new java.lang.reflect.Field(
+                var field = new java.lang.reflect.Field(
                     DeclaringType.ClassObject,
                     Name,
                     FieldTypeWrapper.EnsureLoadable(DeclaringType.GetClassLoader()).ClassObject,
@@ -1429,16 +1428,13 @@ namespace IKVM.Internal
                     DeclaringType.GetGenericFieldSignature(this),
                     null
                 );
+
+                // set latest value
+                Interlocked.CompareExchange(ref reflectionField, field, null);
             }
 
-            // get latest value
-            field = Interlocked.CompareExchange(ref reflectionField, field, null);
-
-            // user requested a copy
-            if (copy)
-                field = field.copy();
-
-            return field;
+            // return requested version
+            return copy ? reflectionField.copy() : reflectionField;
 #endif
         }
 
