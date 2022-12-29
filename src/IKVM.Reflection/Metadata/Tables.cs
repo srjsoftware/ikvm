@@ -388,7 +388,7 @@ namespace IKVM.Reflection.Metadata
 
 	abstract class Table<T> : Table
 	{
-		internal T[] records = Empty<T>.Array;
+		internal T[] records = Array.Empty<T>();
 		protected int rowCount;
 
 		internal sealed override int RowCount

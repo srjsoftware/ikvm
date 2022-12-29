@@ -26,6 +26,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.SymbolStore;
 using System.IO;
+using System.Linq;
 using System.Resources;
 using System.Runtime.InteropServices;
 
@@ -754,7 +755,7 @@ namespace IKVM.Reflection.Emit
 
         public MethodToken GetMethodToken(MethodInfo method, IEnumerable<Type> optionalParameterTypes)
         {
-            return __GetMethodToken(method, Util.ToArray(optionalParameterTypes), null);
+            return __GetMethodToken(method, optionalParameterTypes.ToArray(), null);
         }
 
         public MethodToken __GetMethodToken(MethodInfo method, Type[] optionalParameterTypes, CustomModifiers[] customModifiers)
@@ -925,7 +926,7 @@ namespace IKVM.Reflection.Emit
             }
             if (publicKeyOrToken == null || publicKeyOrToken.Length == 0)
             {
-                publicKeyOrToken = name.GetPublicKeyToken() ?? Empty<byte>.Array;
+                publicKeyOrToken = name.GetPublicKeyToken() ?? Array.Empty<byte>();
             }
             else
             {

@@ -444,10 +444,7 @@ namespace IKVM.Internal
 
         internal void SetDeclaredExceptions(string[] exceptions)
         {
-            if (exceptions == null)
-            {
-                exceptions = new string[0];
-            }
+            exceptions ??= new string[0];
             this.declaredExceptions = (string[])exceptions.Clone();
         }
 
@@ -457,32 +454,33 @@ namespace IKVM.Internal
         }
 
 #if !IMPORTER && !EXPORTER
+
         internal java.lang.reflect.Executable ToMethodOrConstructor(bool copy)
         {
 #if FIRST_PASS
-            return null;
+            throw new NotImplementedException();
 #else
             java.lang.reflect.Executable method = reflectionMethod;
             if (method == null)
             {
                 Link();
-                ClassLoaderWrapper loader = this.DeclaringType.GetClassLoader();
-                TypeWrapper[] argTypes = GetParameters();
-                java.lang.Class[] parameterTypes = new java.lang.Class[argTypes.Length];
+
+                var loader = DeclaringType.GetClassLoader();
+                var argTypes = GetParameters();
+                var parameterTypes = new java.lang.Class[argTypes.Length];
                 for (int i = 0; i < argTypes.Length; i++)
-                {
                     parameterTypes[i] = argTypes[i].EnsureLoadable(loader).ClassObject;
-                }
-                java.lang.Class[] checkedExceptions = GetExceptions();
-                if (this.IsConstructor)
+
+                var checkedExceptions = GetExceptions();
+                if (IsConstructor)
                 {
                     method = new java.lang.reflect.Constructor(
-                        this.DeclaringType.ClassObject,
+                        DeclaringType.ClassObject,
                         parameterTypes,
                         checkedExceptions,
-                        (int)this.Modifiers | (this.IsInternal ? 0x40000000 : 0),
-                        Array.IndexOf(this.DeclaringType.GetMethods(), this),
-                        this.DeclaringType.GetGenericMethodSignature(this),
+                        (int)Modifiers | (IsInternal ? 0x40000000 : 0),
+                        Array.IndexOf(DeclaringType.GetMethods(), this),
+                        DeclaringType.GetGenericMethodSignature(this),
                         null,
                         null
                     );
@@ -490,45 +488,44 @@ namespace IKVM.Internal
                 else
                 {
                     method = new java.lang.reflect.Method(
-                        this.DeclaringType.ClassObject,
-                        this.Name,
+                        DeclaringType.ClassObject,
+                        Name,
                         parameterTypes,
-                        this.ReturnType.EnsureLoadable(loader).ClassObject,
+                        ReturnType.EnsureLoadable(loader).ClassObject,
                         checkedExceptions,
-                        (int)this.Modifiers | (this.IsInternal ? 0x40000000 : 0),
-                        Array.IndexOf(this.DeclaringType.GetMethods(), this),
-                        this.DeclaringType.GetGenericMethodSignature(this),
+                        (int)Modifiers | (IsInternal ? 0x40000000 : 0),
+                        Array.IndexOf(DeclaringType.GetMethods(), this),
+                        DeclaringType.GetGenericMethodSignature(this),
                         null,
                         null,
                         null
                     );
                 }
+
                 lock (this)
                 {
                     if (reflectionMethod == null)
-                    {
                         reflectionMethod = method;
-                    }
                     else
-                    {
                         method = reflectionMethod;
-                    }
                 }
             }
+
             if (copy)
             {
-                java.lang.reflect.Constructor ctor = method as java.lang.reflect.Constructor;
+                var ctor = method as java.lang.reflect.Constructor;
                 if (ctor != null)
-                {
                     return ctor.copy();
-                }
+
                 return ((java.lang.reflect.Method)method).copy();
             }
+
             return method;
 #endif
         }
 
 #if !FIRST_PASS
+
         private java.lang.Class[] GetExceptions()
         {
             string[] classes = declaredExceptions;
@@ -569,16 +566,29 @@ namespace IKVM.Internal
         }
 #endif // !FIRST_PASS
 
+        /// <summary>
+        /// Resolves the <see cref="MethodWrapper"/> associated with the specified
+        /// <see cref="java.lang.reflect.Executable"/>. This can be used to lookup the internal information regarding a
+        /// constructor or method reflection entity from Java.
+        /// </summary>
+        /// <param name="executable"></param>
+        /// <returns></returns>
         internal static MethodWrapper FromExecutable(java.lang.reflect.Executable executable)
         {
 #if FIRST_PASS
-            return null;
+            throw new NotImplementedException();
 #else
             return TypeWrapper.FromClass(executable.getDeclaringClass()).GetMethods()[executable._slot()];
 #endif
         }
-#endif // !IMPORTER && !EXPORTER
+#endif
 
+        /// <summary>
+        /// Resolves the <see cref="MethodWrapper"/> associated with the specified 'cookie'. A cookie is a platform
+        /// integer that uniquely identifies a method or constructor within the framework.
+        /// </summary>
+        /// <param name="cookie"></param>
+        /// <returns></returns>
         [System.Security.SecurityCritical]
         internal static MethodWrapper FromCookie(IntPtr cookie)
         {
@@ -1317,41 +1327,68 @@ namespace IKVM.Internal
 
     abstract class FieldWrapper : MemberWrapper
     {
-#if !IMPORTER && !FIRST_PASS && !EXPORTER
-        private volatile java.lang.reflect.Field reflectionField;
-        private sun.reflect.FieldAccessor jniAccessor;
-#endif
-        internal static readonly FieldWrapper[] EmptyArray = new FieldWrapper[0];
-        private FieldInfo field;
-        private TypeWrapper fieldType;
 
-        internal FieldWrapper(TypeWrapper declaringType, TypeWrapper fieldType, string name, string sig, Modifiers modifiers, FieldInfo field, MemberFlags flags)
-            : base(declaringType, name, sig, modifiers, flags)
+        internal static readonly FieldWrapper[] EmptyArray = Array.Empty<FieldWrapper>();
+
+#if !IMPORTER && !FIRST_PASS && !EXPORTER
+        volatile java.lang.reflect.Field reflectionField;
+#endif
+
+        FieldInfo field;
+        TypeWrapper fieldType;
+
+        /// <summary>
+        /// Initializes a new instance.
+        /// </summary>
+        /// <param name="declaringType"></param>
+        /// <param name="fieldType"></param>
+        /// <param name="name"></param>
+        /// <param name="sig"></param>
+        /// <param name="modifiers"></param>
+        /// <param name="field"></param>
+        /// <param name="flags"></param>
+        internal FieldWrapper(TypeWrapper declaringType, TypeWrapper fieldType, string name, string sig, Modifiers modifiers, FieldInfo field, MemberFlags flags) :
+            base(declaringType, name, sig, modifiers, flags)
         {
-            Debug.Assert(name != null);
-            Debug.Assert(sig != null);
+            if (name is null)
+                throw new ArgumentNullException(nameof(name));
+            if (sig is null)
+                throw new ArgumentNullException(nameof(sig));
+
             this.fieldType = fieldType;
             this.field = field;
+
             UpdateNonPublicTypeInSignatureFlag();
+
 #if IMPORTER
-            if (IsFinal
-                && DeclaringType.IsPublic
-                && !DeclaringType.IsInterface
-                && (IsPublic || (IsProtected && !DeclaringType.IsFinal))
-                && !DeclaringType.GetClassLoader().StrictFinalFieldSemantics
-                && DeclaringType.IsDynamic
-                && !(this is ConstantFieldWrapper)
-                && !(this is DynamicPropertyFieldWrapper))
-            {
+
+            if (IsFinal &&
+                DeclaringType.IsPublic &&
+                !DeclaringType.IsInterface &&
+                (IsPublic || (IsProtected && !DeclaringType.IsFinal)) &&
+                !DeclaringType.GetClassLoader().StrictFinalFieldSemantics &&
+                DeclaringType.IsDynamic &&
+                this is not ConstantFieldWrapper &&
+                this is not DynamicPropertyFieldWrapper)
                 SetType2FinalField();
-            }
+
 #endif
+
         }
 
-        internal FieldWrapper(TypeWrapper declaringType, TypeWrapper fieldType, string name, string sig, ExModifiers modifiers, FieldInfo field)
-            : this(declaringType, fieldType, name, sig, modifiers.Modifiers, field,
-                    (modifiers.IsInternal ? MemberFlags.InternalAccess : MemberFlags.None))
+        /// <summary>
+        /// Initializes a new instance.
+        /// </summary>
+        /// <param name="declaringType"></param>
+        /// <param name="fieldType"></param>
+        /// <param name="name"></param>
+        /// <param name="sig"></param>
+        /// <param name="modifiers"></param>
+        /// <param name="field"></param>
+        internal FieldWrapper(TypeWrapper declaringType, TypeWrapper fieldType, string name, string sig, ExModifiers modifiers, FieldInfo field) :
+            this(declaringType, fieldType, name, sig, modifiers.Modifiers, field, (modifiers.IsInternal ? MemberFlags.InternalAccess : MemberFlags.None))
         {
+
         }
 
         private void UpdateNonPublicTypeInSignatureFlag()
@@ -1551,8 +1588,8 @@ namespace IKVM.Internal
             // volatile long & double field accesses must be made atomic
             if ((modifiers.Modifiers & Modifiers.Volatile) != 0 && (sig == "J" || sig == "D"))
                 return new VolatileLongDoubleFieldWrapper(declaringType, fieldType, fi, name, sig, modifiers);
-
-            return new SimpleFieldWrapper(declaringType, fieldType, fi, name, sig, modifiers);
+            else
+                return new SimpleFieldWrapper(declaringType, fieldType, fi, name, sig, modifiers);
         }
 
 #if !IMPORTER && !EXPORTER
@@ -1581,594 +1618,6 @@ namespace IKVM.Internal
 #endif
 
 #endif // !IMPORTER && !EXPORTER
-    }
-
-    sealed class SimpleFieldWrapper : FieldWrapper
-    {
-        internal SimpleFieldWrapper(TypeWrapper declaringType, TypeWrapper fieldType, FieldInfo fi, string name, string sig, ExModifiers modifiers)
-            : base(declaringType, fieldType, name, sig, modifiers, fi)
-        {
-            Debug.Assert(!(fieldType == PrimitiveTypeWrapper.DOUBLE || fieldType == PrimitiveTypeWrapper.LONG) || !IsVolatile);
-        }
-
-#if EMITTERS
-        protected override void EmitGetImpl(CodeEmitter ilgen)
-        {
-            if (!IsStatic && DeclaringType.IsNonPrimitiveValueType)
-            {
-                ilgen.Emit(OpCodes.Unbox, DeclaringType.TypeAsTBD);
-            }
-            if (IsVolatile)
-            {
-                ilgen.Emit(OpCodes.Volatile);
-            }
-            ilgen.Emit(IsStatic ? OpCodes.Ldsfld : OpCodes.Ldfld, GetField());
-        }
-
-        protected override void EmitSetImpl(CodeEmitter ilgen)
-        {
-            FieldInfo fi = GetField();
-            if (!IsStatic && DeclaringType.IsNonPrimitiveValueType)
-            {
-                CodeEmitterLocal temp = ilgen.DeclareLocal(FieldTypeWrapper.TypeAsSignatureType);
-                ilgen.Emit(OpCodes.Stloc, temp);
-                ilgen.Emit(OpCodes.Unbox, DeclaringType.TypeAsTBD);
-                ilgen.Emit(OpCodes.Ldloc, temp);
-            }
-            if (IsVolatile)
-            {
-                ilgen.Emit(OpCodes.Volatile);
-            }
-            ilgen.Emit(IsStatic ? OpCodes.Stsfld : OpCodes.Stfld, fi);
-            if (IsVolatile)
-            {
-                ilgen.EmitMemoryBarrier();
-            }
-        }
-#endif // EMITTERS
-
-#if !IMPORTER && !EXPORTER && !FIRST_PASS
-        internal override object GetValue(object obj)
-        {
-            return GetField().GetValue(obj);
-        }
-
-        internal override void SetValue(object obj, object value)
-        {
-            GetField().SetValue(obj, value);
-        }
-#endif // !IMPORTER && !EXPORTER && !FIRST_PASS
-    }
-
-    sealed class VolatileLongDoubleFieldWrapper : FieldWrapper
-    {
-        internal VolatileLongDoubleFieldWrapper(TypeWrapper declaringType, TypeWrapper fieldType, FieldInfo fi, string name, string sig, ExModifiers modifiers)
-            : base(declaringType, fieldType, name, sig, modifiers, fi)
-        {
-            Debug.Assert(IsVolatile);
-            Debug.Assert(sig == "J" || sig == "D");
-        }
-
-#if EMITTERS
-        protected override void EmitGetImpl(CodeEmitter ilgen)
-        {
-            FieldInfo fi = GetField();
-            if (fi.IsStatic)
-            {
-                ilgen.Emit(OpCodes.Ldsflda, fi);
-            }
-            else
-            {
-                if (DeclaringType.IsNonPrimitiveValueType)
-                {
-                    ilgen.Emit(OpCodes.Unbox, DeclaringType.TypeAsTBD);
-                }
-                ilgen.Emit(OpCodes.Ldflda, fi);
-            }
-            if (FieldTypeWrapper == PrimitiveTypeWrapper.DOUBLE)
-            {
-                ilgen.Emit(OpCodes.Call, ByteCodeHelperMethods.volatileReadDouble);
-            }
-            else
-            {
-                Debug.Assert(FieldTypeWrapper == PrimitiveTypeWrapper.LONG);
-                ilgen.Emit(OpCodes.Call, ByteCodeHelperMethods.volatileReadLong);
-            }
-        }
-
-        protected override void EmitSetImpl(CodeEmitter ilgen)
-        {
-            FieldInfo fi = GetField();
-            CodeEmitterLocal temp = ilgen.DeclareLocal(FieldTypeWrapper.TypeAsSignatureType);
-            ilgen.Emit(OpCodes.Stloc, temp);
-            if (fi.IsStatic)
-            {
-                ilgen.Emit(OpCodes.Ldsflda, fi);
-            }
-            else
-            {
-                if (DeclaringType.IsNonPrimitiveValueType)
-                {
-                    ilgen.Emit(OpCodes.Unbox, DeclaringType.TypeAsTBD);
-                }
-                ilgen.Emit(OpCodes.Ldflda, fi);
-            }
-            ilgen.Emit(OpCodes.Ldloc, temp);
-            if (FieldTypeWrapper == PrimitiveTypeWrapper.DOUBLE)
-            {
-                ilgen.Emit(OpCodes.Call, ByteCodeHelperMethods.volatileWriteDouble);
-            }
-            else
-            {
-                Debug.Assert(FieldTypeWrapper == PrimitiveTypeWrapper.LONG);
-                ilgen.Emit(OpCodes.Call, ByteCodeHelperMethods.volatileWriteLong);
-            }
-        }
-#endif // EMITTERS
-
-#if !IMPORTER && !EXPORTER && !FIRST_PASS
-#if NO_REF_EMIT
-		internal static readonly object lockObject = new object();
-#endif
-
-        internal override object GetValue(object obj)
-        {
-#if NO_REF_EMIT
-			lock (lockObject)
-			{
-				return GetField().GetValue(obj);
-			}
-#else
-            throw new InvalidOperationException();
-#endif
-        }
-
-        internal override void SetValue(object obj, object value)
-        {
-#if NO_REF_EMIT
-			lock (lockObject)
-			{
-				GetField().SetValue(obj, value);
-			}
-#else
-            throw new InvalidOperationException();
-#endif
-        }
-#endif // !IMPORTER && !EXPORTER && !FIRST_PASS
-    }
-
-#if !EXPORTER
-
-    /// <summary>
-    /// Represents a .NET property defined in Java with the <see cref="ikvm.lang.Property"/> annotation.
-    /// </summary>
-    sealed class DynamicPropertyFieldWrapper : FieldWrapper
-    {
-
-        readonly MethodWrapper getter;
-        readonly MethodWrapper setter;
-        PropertyBuilder pb;
-
-        MethodWrapper GetMethod(string name, string sig, bool isstatic)
-        {
-            if (name != null)
-            {
-                var mw = DeclaringType.GetMethodWrapper(name, sig, false);
-                if (mw != null && mw.IsStatic == isstatic)
-                {
-                    mw.IsPropertyAccessor = true;
-                    return mw;
-                }
-
-                Tracer.Error(Tracer.Compiler, "Property '{0}' accessor '{1}' not found in class '{2}'", this.Name, name, this.DeclaringType.Name);
-            }
-
-            return null;
-        }
-
-        internal DynamicPropertyFieldWrapper(TypeWrapper declaringType, ClassFile.Field fld) :
-            base(declaringType, null, fld.Name, fld.Signature, new ExModifiers(fld.Modifiers, fld.IsInternal), null)
-        {
-            getter = GetMethod(fld.PropertyGetter, "()" + fld.Signature, fld.IsStatic);
-            setter = GetMethod(fld.PropertySetter, "(" + fld.Signature + ")V", fld.IsStatic);
-        }
-
-#if !IMPORTER && !FIRST_PASS
-
-        internal override void ResolveField()
-        {
-            getter?.ResolveMethod();
-            setter?.ResolveMethod();
-        }
-
-#endif
-
-        internal PropertyBuilder GetPropertyBuilder()
-        {
-            AssertLinked();
-            return pb;
-        }
-
-        internal void DoLink(TypeBuilder tb)
-        {
-            if (getter != null)
-            {
-                getter.Link();
-            }
-            if (setter != null)
-            {
-                setter.Link();
-            }
-            pb = tb.DefineProperty(this.Name, PropertyAttributes.None, this.FieldTypeWrapper.TypeAsSignatureType, Type.EmptyTypes);
-            if (getter != null)
-            {
-                pb.SetGetMethod((MethodBuilder)getter.GetMethod());
-            }
-            if (setter != null)
-            {
-                pb.SetSetMethod((MethodBuilder)setter.GetMethod());
-            }
-#if IMPORTER
-            AttributeHelper.SetModifiers(pb, this.Modifiers, this.IsInternal);
-#endif
-        }
-
-#if EMITTERS
-        protected override void EmitGetImpl(CodeEmitter ilgen)
-        {
-            if (getter == null)
-            {
-                EmitThrowNoSuchMethodErrorForGetter(ilgen, this.FieldTypeWrapper, this);
-            }
-            else if (getter.IsStatic)
-            {
-                getter.EmitCall(ilgen);
-            }
-            else
-            {
-                getter.EmitCallvirt(ilgen);
-            }
-        }
-
-        internal static void EmitThrowNoSuchMethodErrorForGetter(CodeEmitter ilgen, TypeWrapper type, MemberWrapper member)
-        {
-#if IMPORTER
-            StaticCompiler.IssueMessage(Message.EmittedNoSuchMethodError, "<unknown>", member.DeclaringType.Name + "." + member.Name + member.Signature);
-#endif
-            // HACK the branch around the throw is to keep the verifier happy
-            CodeEmitterLabel label = ilgen.DefineLabel();
-            ilgen.Emit(OpCodes.Ldc_I4_0);
-            ilgen.EmitBrtrue(label);
-            ilgen.EmitThrow("java.lang.NoSuchMethodError");
-            ilgen.MarkLabel(label);
-            if (!member.IsStatic)
-            {
-                ilgen.Emit(OpCodes.Pop);
-            }
-            ilgen.Emit(OpCodes.Ldloc, ilgen.DeclareLocal(type.TypeAsLocalOrStackType));
-        }
-
-        protected override void EmitSetImpl(CodeEmitter ilgen)
-        {
-            if (setter == null)
-            {
-                if (this.IsFinal)
-                {
-                    ilgen.Emit(OpCodes.Pop);
-                    if (!this.IsStatic)
-                    {
-                        ilgen.Emit(OpCodes.Pop);
-                    }
-                }
-                else
-                {
-                    EmitThrowNoSuchMethodErrorForSetter(ilgen, this);
-                }
-            }
-            else if (setter.IsStatic)
-            {
-                setter.EmitCall(ilgen);
-            }
-            else
-            {
-                setter.EmitCallvirt(ilgen);
-            }
-        }
-
-        internal static void EmitThrowNoSuchMethodErrorForSetter(CodeEmitter ilgen, MemberWrapper member)
-        {
-#if IMPORTER
-            StaticCompiler.IssueMessage(Message.EmittedNoSuchMethodError, "<unknown>", member.DeclaringType.Name + "." + member.Name + member.Signature);
-#endif
-            // HACK the branch around the throw is to keep the verifier happy
-            CodeEmitterLabel label = ilgen.DefineLabel();
-            ilgen.Emit(OpCodes.Ldc_I4_0);
-            ilgen.EmitBrtrue(label);
-            ilgen.EmitThrow("java.lang.NoSuchMethodError");
-            ilgen.MarkLabel(label);
-            ilgen.Emit(OpCodes.Pop);
-            if (!member.IsStatic)
-            {
-                ilgen.Emit(OpCodes.Pop);
-            }
-        }
-#endif // EMITTERS
-
-#if !IMPORTER && !FIRST_PASS
-        internal override object GetValue(object obj)
-        {
-            if (getter == null)
-            {
-                throw new java.lang.NoSuchMethodError();
-            }
-            return getter.Invoke(obj, new object[0]);
-        }
-
-        internal override void SetValue(object obj, object value)
-        {
-            if (setter == null)
-            {
-                throw new java.lang.NoSuchMethodError();
-            }
-            setter.Invoke(obj, new object[] { value });
-        }
-#endif
-    }
-#endif // !EXPORTER
-
-    // this class represents a .NET property defined in Java with the ikvm.lang.Property annotation
-    sealed class CompiledPropertyFieldWrapper : FieldWrapper
-    {
-        private readonly PropertyInfo property;
-
-        internal CompiledPropertyFieldWrapper(TypeWrapper declaringType, PropertyInfo property, ExModifiers modifiers)
-            : base(declaringType, ClassLoaderWrapper.GetWrapperFromType(property.PropertyType), property.Name, ClassLoaderWrapper.GetWrapperFromType(property.PropertyType).SigName, modifiers, null)
-        {
-            this.property = property;
-        }
-
-#if EMITTERS
-        protected override void EmitGetImpl(CodeEmitter ilgen)
-        {
-            MethodInfo getter = property.GetGetMethod(true);
-            if (getter == null)
-            {
-                DynamicPropertyFieldWrapper.EmitThrowNoSuchMethodErrorForGetter(ilgen, this.FieldTypeWrapper, this);
-            }
-            else if (getter.IsStatic)
-            {
-                ilgen.Emit(OpCodes.Call, getter);
-            }
-            else
-            {
-                ilgen.Emit(OpCodes.Callvirt, getter);
-            }
-        }
-
-        protected override void EmitSetImpl(CodeEmitter ilgen)
-        {
-            MethodInfo setter = property.GetSetMethod(true);
-            if (setter == null)
-            {
-                if (this.IsFinal)
-                {
-                    ilgen.Emit(OpCodes.Pop);
-                    if (!this.IsStatic)
-                    {
-                        ilgen.Emit(OpCodes.Pop);
-                    }
-                }
-                else
-                {
-                    DynamicPropertyFieldWrapper.EmitThrowNoSuchMethodErrorForSetter(ilgen, this);
-                }
-            }
-            else if (setter.IsStatic)
-            {
-                ilgen.Emit(OpCodes.Call, setter);
-            }
-            else
-            {
-                ilgen.Emit(OpCodes.Callvirt, setter);
-            }
-        }
-#endif // EMITTERS
-
-#if !IMPORTER && !EXPORTER && !FIRST_PASS
-        internal override object GetValue(object obj)
-        {
-            MethodInfo getter = property.GetGetMethod(true);
-            if (getter == null)
-            {
-                throw new java.lang.NoSuchMethodError();
-            }
-            return getter.Invoke(obj, new object[0]);
-        }
-
-        internal override void SetValue(object obj, object value)
-        {
-            MethodInfo setter = property.GetSetMethod(true);
-            if (setter == null)
-            {
-                throw new java.lang.NoSuchMethodError();
-            }
-            setter.Invoke(obj, new object[] { value });
-        }
-#endif
-
-        internal PropertyInfo GetProperty()
-        {
-            return property;
-        }
-    }
-
-    sealed class ConstantFieldWrapper : FieldWrapper
-    {
-        // NOTE this field wrapper can resprent a .NET enum, but in that case "constant" contains the raw constant value (i.e. the boxed underlying primitive value, not a boxed enum)
-        private object constant;
-
-        internal ConstantFieldWrapper(TypeWrapper declaringType, TypeWrapper fieldType, string name, string sig, Modifiers modifiers, FieldInfo field, object constant, MemberFlags flags)
-            : base(declaringType, fieldType, name, sig, modifiers, field, flags)
-        {
-            Debug.Assert(IsStatic);
-            Debug.Assert(constant == null || constant.GetType().IsPrimitive || constant is string);
-            this.constant = constant;
-        }
-
-#if EMITTERS
-        protected override void EmitGetImpl(CodeEmitter ilgen)
-        {
-            // Reading a field should trigger the cctor, but since we're inlining the value
-            // we have to trigger it explicitly
-            DeclaringType.EmitRunClassConstructor(ilgen);
-
-            // NOTE even though you're not supposed to access a constant static final (the compiler is supposed
-            // to inline them), we have to support it (because it does happen, e.g. if the field becomes final
-            // after the referencing class was compiled, or when we're accessing an unsigned primitive .NET field)
-            object v = GetConstantValue();
-            if (v == null)
-            {
-                ilgen.Emit(OpCodes.Ldnull);
-            }
-            else if (constant is int ||
-                constant is short ||
-                constant is ushort ||
-                constant is byte ||
-                constant is sbyte ||
-                constant is char ||
-                constant is bool)
-            {
-                ilgen.EmitLdc_I4(((IConvertible)constant).ToInt32(null));
-            }
-            else if (constant is string)
-            {
-                ilgen.Emit(OpCodes.Ldstr, (string)constant);
-            }
-            else if (constant is float)
-            {
-                ilgen.EmitLdc_R4((float)constant);
-            }
-            else if (constant is double)
-            {
-                ilgen.EmitLdc_R8((double)constant);
-            }
-            else if (constant is long)
-            {
-                ilgen.EmitLdc_I8((long)constant);
-            }
-            else if (constant is uint)
-            {
-                ilgen.EmitLdc_I4(unchecked((int)((IConvertible)constant).ToUInt32(null)));
-            }
-            else if (constant is ulong)
-            {
-                ilgen.EmitLdc_I8(unchecked((long)(ulong)constant));
-            }
-            else
-            {
-                throw new InvalidOperationException(constant.GetType().FullName);
-            }
-        }
-
-        protected override void EmitSetImpl(CodeEmitter ilgen)
-        {
-            // when constant static final fields are updated, the JIT normally doesn't see that (because the
-            // constant value is inlined), so we emulate that behavior by emitting a Pop
-            ilgen.Emit(OpCodes.Pop);
-        }
-#endif // EMITTERS
-
-        internal object GetConstantValue()
-        {
-            if (constant == null)
-            {
-                FieldInfo field = GetField();
-                constant = field.GetRawConstantValue();
-            }
-            return constant;
-        }
-
-#if !EXPORTER && !IMPORTER && !FIRST_PASS
-        internal override object GetValue(object obj)
-        {
-            FieldInfo field = GetField();
-            return FieldTypeWrapper.IsPrimitive || field == null
-                ? GetConstantValue()
-                : field.GetValue(null);
-        }
-
-        internal override void SetValue(object obj, object value)
-        {
-        }
-#endif
-    }
-
-    sealed class CompiledAccessStubFieldWrapper : FieldWrapper
-    {
-        private readonly MethodInfo getter;
-        private readonly MethodInfo setter;
-
-        private static Modifiers GetModifiers(PropertyInfo property)
-        {
-            // NOTE we only support the subset of modifiers that is expected for "access stub" properties
-            MethodInfo getter = property.GetGetMethod(true);
-            Modifiers modifiers = getter.IsPublic ? Modifiers.Public : Modifiers.Protected;
-            if (!property.CanWrite)
-            {
-                modifiers |= Modifiers.Final;
-            }
-            if (getter.IsStatic)
-            {
-                modifiers |= Modifiers.Static;
-            }
-            return modifiers;
-        }
-
-        // constructor for type 1 access stubs
-        internal CompiledAccessStubFieldWrapper(TypeWrapper wrapper, PropertyInfo property, TypeWrapper propertyType)
-            : this(wrapper, property, null, propertyType, GetModifiers(property), MemberFlags.HideFromReflection | MemberFlags.AccessStub)
-        {
-        }
-
-        // constructor for type 2 access stubs
-        internal CompiledAccessStubFieldWrapper(TypeWrapper wrapper, PropertyInfo property, FieldInfo field, TypeWrapper propertyType)
-            : this(wrapper, property, field, propertyType, AttributeHelper.GetModifiersAttribute(property).Modifiers, MemberFlags.AccessStub)
-        {
-        }
-
-        private CompiledAccessStubFieldWrapper(TypeWrapper wrapper, PropertyInfo property, FieldInfo field, TypeWrapper propertyType, Modifiers modifiers, MemberFlags flags)
-            : base(wrapper, propertyType, property.Name, propertyType.SigName, modifiers, field, flags)
-        {
-            this.getter = property.GetGetMethod(true);
-            this.setter = property.GetSetMethod(true);
-        }
-
-#if EMITTERS
-        protected override void EmitGetImpl(CodeEmitter ilgen)
-        {
-            ilgen.Emit(OpCodes.Call, getter);
-        }
-
-        protected override void EmitSetImpl(CodeEmitter ilgen)
-        {
-            ilgen.Emit(OpCodes.Call, setter);
-        }
-#endif // EMITTERS
-
-#if !IMPORTER && !EXPORTER && !FIRST_PASS
-        internal override object GetValue(object obj)
-        {
-            // we can only be invoked on type 2 access stubs (because type 1 access stubs are HideFromReflection), so we know we have a field
-            return GetField().GetValue(obj);
-        }
-
-        internal override void SetValue(object obj, object value)
-        {
-            // we can only be invoked on type 2 access stubs (because type 1 access stubs are HideFromReflection), so we know we have a field
-            GetField().SetValue(obj, value);
-        }
-
-#endif // !IMPORTER && !EXPORTER && !FIRST_PASS
     }
 
 }

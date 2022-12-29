@@ -25,42 +25,13 @@
 namespace IKVM.Internal
 {
 
-    sealed partial class ClassFile
+    struct MethodParametersEntry
     {
 
-        sealed class ConstantPoolItemString : ConstantPoolItem
-        {
+        internal static readonly MethodParametersEntry[] Malformed = new MethodParametersEntry[0];
+        internal string name;
+        internal ushort flags;
 
-            ushort string_index;
-            string s;
-
-            /// <summary>
-            /// Initializes a new instance.
-            /// </summary>
-            /// <param name="br"></param>
-            internal ConstantPoolItemString(BigEndianBinaryReader br)
-            {
-                string_index = br.ReadUInt16();
-            }
-
-            internal override void Resolve(ClassFile classFile, string[] utf8_cp, ClassFileParseOptions options)
-            {
-                s = classFile.GetConstantPoolUtf8String(utf8_cp, string_index);
-            }
-
-            internal override ConstantType GetConstantType()
-            {
-                return ConstantType.String;
-            }
-
-            internal string Value
-            {
-                get
-                {
-                    return s;
-                }
-            }
-        }
     }
 
 }

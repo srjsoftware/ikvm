@@ -21,45 +21,36 @@
   jeroen@frijters.net
   
 */
+using System;
 
 namespace IKVM.Internal
 {
 
-    sealed partial class ClassFile
+    static class ArrayUtil
     {
 
-        sealed class ConstantPoolItemString : ConstantPoolItem
+        internal static T[] Concat<T, X>(X obj, T[] arr)
+            where X : T
         {
+            var narr = new T[arr.Length + 1];
+            narr[0] = obj;
+            Array.Copy(arr, 0, narr, 1, arr.Length);
+            return narr;
+        }
 
-            ushort string_index;
-            string s;
+        internal static T[] Concat<T, X>(T[] arr, X obj)
+            where X : T
+        {
+            Array.Resize(ref arr, arr.Length + 1);
+            arr[arr.Length - 1] = obj;
+            return arr;
+        }
 
-            /// <summary>
-            /// Initializes a new instance.
-            /// </summary>
-            /// <param name="br"></param>
-            internal ConstantPoolItemString(BigEndianBinaryReader br)
-            {
-                string_index = br.ReadUInt16();
-            }
-
-            internal override void Resolve(ClassFile classFile, string[] utf8_cp, ClassFileParseOptions options)
-            {
-                s = classFile.GetConstantPoolUtf8String(utf8_cp, string_index);
-            }
-
-            internal override ConstantType GetConstantType()
-            {
-                return ConstantType.String;
-            }
-
-            internal string Value
-            {
-                get
-                {
-                    return s;
-                }
-            }
+        internal static T[] DropFirst<T>(T[] arr)
+        {
+            var narr = new T[arr.Length - 1];
+            Array.Copy(arr, 1, narr, 0, narr.Length);
+            return narr;
         }
     }
 

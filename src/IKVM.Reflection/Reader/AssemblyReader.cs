@@ -67,7 +67,7 @@ namespace IKVM.Reflection.Reader
 			}
 			else
 			{
-				name.SetPublicKey(Empty<byte>.Array);
+				name.SetPublicKey(Array.Empty<byte>());
 			}
 			if (rec.Culture != 0)
 			{

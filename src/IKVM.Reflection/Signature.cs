@@ -552,7 +552,7 @@ namespace IKVM.Reflection
 				CustomModifiers.Skip(br);
 				ReadType(module, br, context);
 			}
-			customModifiers = Empty<CustomModifiers>.Array;
+			customModifiers = Array.Empty<CustomModifiers>();
 			return Type.EmptyTypes;
 		}
 

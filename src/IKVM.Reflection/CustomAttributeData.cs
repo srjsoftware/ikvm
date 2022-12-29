@@ -129,7 +129,7 @@ namespace IKVM.Reflection
 			lazyConstructorArguments = constructorArgs.AsReadOnly();
 			if (namedArguments == null)
 			{
-				this.lazyNamedArguments = Empty<CustomAttributeNamedArgument>.Array;
+				this.lazyNamedArguments = Array.Empty<CustomAttributeNamedArgument>();
 			}
 			else
 			{
@@ -147,8 +147,8 @@ namespace IKVM.Reflection
 			if (br.Length == 0)
 			{
 				// it's legal to have an empty blob
-				lazyConstructorArguments = Empty<CustomAttributeTypedArgument>.Array;
-				lazyNamedArguments = Empty<CustomAttributeNamedArgument>.Array;
+				lazyConstructorArguments = Array.Empty<CustomAttributeTypedArgument>();
+				lazyNamedArguments = Array.Empty<CustomAttributeNamedArgument>();
 			}
 			else
 			{
@@ -620,8 +620,8 @@ namespace IKVM.Reflection
 			if (br.Length == 0)
 			{
 				// it's legal to have an empty blob
-				lazyConstructorArguments = Empty<CustomAttributeTypedArgument>.Array;
-				lazyNamedArguments = Empty<CustomAttributeNamedArgument>.Array;
+				lazyConstructorArguments = Array.Empty<CustomAttributeTypedArgument>();
+				lazyNamedArguments = Array.Empty<CustomAttributeNamedArgument>();
 			}
 			else
 			{
@@ -1016,7 +1016,7 @@ namespace IKVM.Reflection
 		{
 			Type type = module.universe.System_Runtime_InteropServices_PreserveSigAttribute;
 			ConstructorInfo constructor = type.GetPseudoCustomAttributeConstructor();
-			return new CustomAttributeData(module, constructor, Empty<object>.Array, null);
+			return new CustomAttributeData(module, constructor, Array.Empty<object>(), null);
 		}
 	}
 }

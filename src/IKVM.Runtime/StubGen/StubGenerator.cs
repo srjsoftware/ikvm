@@ -24,6 +24,7 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+
 #if EXPORTER
 using IKVM.Reflection;
 using Type = IKVM.Reflection.Type;
@@ -36,7 +37,7 @@ using IKVM.Internal;
 
 namespace IKVM.StubGen
 {
-    static class StubGenerator
+	static class StubGenerator
 	{
 		internal static void WriteClass(Stream stream, TypeWrapper tw, bool includeNonPublicInterfaces, bool includeNonPublicMembers, bool includeSerialVersionUID, bool includeParameterNames)
 		{

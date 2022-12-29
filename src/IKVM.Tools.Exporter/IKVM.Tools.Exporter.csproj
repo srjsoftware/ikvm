@@ -37,6 +37,20 @@
         <Compile Include="..\IKVM.Runtime\StubGen\**\*.cs" LinkBase="IKVM.Runtime\StubGen" />
         <Compile Include="..\IKVM.Runtime\LoadMode.cs" LinkBase="IKVM.Runtime" />
         <Compile Include="..\IKVM.Runtime\CodeGenOptions.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\MethodParametersEntry.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\ExModifiers.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\AttributeHelper.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\CompiledAccessStubFieldWrapper.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\ConstantFieldWrapper.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\SimpleFieldWrapper.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\StringConstants.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\CompiledPropertyFieldWrapper.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\EnumHelper.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\VolatileLongDoubleFieldWrapper.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\TypeNameUtil.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\Annotation.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\ArrayUtil.cs" LinkBase="IKVM.Runtime" />
+        <Compile Include="..\IKVM.Runtime\UnicodeUtil.cs" LinkBase="IKVM.Runtime" />
     </ItemGroup>
 
     <ItemGroup>

@@ -25,42 +25,15 @@
 namespace IKVM.Internal
 {
 
-    sealed partial class ClassFile
+    static class StringConstants
     {
 
-        sealed class ConstantPoolItemString : ConstantPoolItem
-        {
+        internal static readonly string CLINIT = string.Intern("<clinit>");
+        internal static readonly string INIT = string.Intern("<init>");
+        internal static readonly string SIG_VOID = string.Intern("()V");
+        internal static readonly string FINALIZE = string.Intern("finalize");
+        internal static readonly string CLONE = string.Intern("clone");
 
-            ushort string_index;
-            string s;
-
-            /// <summary>
-            /// Initializes a new instance.
-            /// </summary>
-            /// <param name="br"></param>
-            internal ConstantPoolItemString(BigEndianBinaryReader br)
-            {
-                string_index = br.ReadUInt16();
-            }
-
-            internal override void Resolve(ClassFile classFile, string[] utf8_cp, ClassFileParseOptions options)
-            {
-                s = classFile.GetConstantPoolUtf8String(utf8_cp, string_index);
-            }
-
-            internal override ConstantType GetConstantType()
-            {
-                return ConstantType.String;
-            }
-
-            internal string Value
-            {
-                get
-                {
-                    return s;
-                }
-            }
-        }
     }
 
 }

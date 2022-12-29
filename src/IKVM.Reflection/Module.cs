@@ -263,7 +263,7 @@ namespace IKVM.Reflection
 
 		public FieldInfo[] GetFields(BindingFlags bindingFlags)
 		{
-			return IsResource() ? Empty<FieldInfo>.Array : GetModuleType().GetFields(bindingFlags | BindingFlags.DeclaredOnly);
+			return IsResource() ? Array.Empty<FieldInfo>() : GetModuleType().GetFields(bindingFlags | BindingFlags.DeclaredOnly);
 		}
 
 		public MethodInfo GetMethod(string name)
@@ -288,7 +288,7 @@ namespace IKVM.Reflection
 
 		public MethodInfo[] GetMethods(BindingFlags bindingFlags)
 		{
-			return IsResource() ? Empty<MethodInfo>.Array : GetModuleType().GetMethods(bindingFlags | BindingFlags.DeclaredOnly);
+			return IsResource() ? Array.Empty<MethodInfo>() : GetModuleType().GetMethods(bindingFlags | BindingFlags.DeclaredOnly);
 		}
 
 		public ConstructorInfo __ModuleInitializer
@@ -483,7 +483,7 @@ namespace IKVM.Reflection
 
 		public virtual IList<CustomAttributeData> __GetPlaceholderAssemblyCustomAttributes(bool multiple, bool security)
 		{
-			return Empty<CustomAttributeData>.Array;
+			return Array.Empty<CustomAttributeData>();
 		}
 
 		public abstract AssemblyName[] __GetReferencedAssemblies();

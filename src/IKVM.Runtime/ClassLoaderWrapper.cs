@@ -858,19 +858,24 @@ namespace IKVM.Internal
         internal Type[] ArgTypeListFromSig(string sig)
         {
             if (sig[1] == ')')
-            {
                 return Type.EmptyTypes;
-            }
-            TypeWrapper[] wrappers = ArgTypeWrapperListFromSig(sig, LoadMode.LoadOrThrow);
-            Type[] types = new Type[wrappers.Length];
+
+            var wrappers = ArgTypeWrapperListFromSig(sig, LoadMode.LoadOrThrow);
+            var types = new Type[wrappers.Length];
             for (int i = 0; i < wrappers.Length; i++)
-            {
                 types[i] = wrappers[i].TypeAsSignatureType;
-            }
+
             return types;
         }
 
-        // NOTE: this will ignore anything following the sig marker (so that it can be used to decode method signatures)
+        /// <summary>
+        /// Decodes the next type from the signature string, advancing the index to the trailing position.
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="sig"></param>
+        /// <param name="mode"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidOperationException"></exception>
         private TypeWrapper SigDecoderWrapper(ref int index, string sig, LoadMode mode)
         {
             switch (sig[index++])
@@ -934,12 +939,24 @@ namespace IKVM.Internal
             }
         }
 
+        /// <summary>
+        /// Decodes the next type of the given signature as a field type.
+        /// </summary>
+        /// <param name="sig"></param>
+        /// <param name="mode"></param>
+        /// <returns></returns>
         internal TypeWrapper FieldTypeWrapperFromSig(string sig, LoadMode mode)
         {
             int index = 0;
             return SigDecoderWrapper(ref index, sig, mode);
         }
 
+        /// <summary>
+        /// Decodes the return value of the given signature.
+        /// </summary>
+        /// <param name="sig"></param>
+        /// <param name="mode"></param>
+        /// <returns></returns>
         internal TypeWrapper RetTypeWrapperFromSig(string sig, LoadMode mode)
         {
             int index = sig.IndexOf(')') + 1;
@@ -949,9 +966,8 @@ namespace IKVM.Internal
         internal TypeWrapper[] ArgTypeWrapperListFromSig(string sig, LoadMode mode)
         {
             if (sig[1] == ')')
-            {
                 return TypeWrapper.EmptyArray;
-            }
+
             List<TypeWrapper> list = new List<TypeWrapper>();
             for (int i = 1; sig[i] != ')';)
             {

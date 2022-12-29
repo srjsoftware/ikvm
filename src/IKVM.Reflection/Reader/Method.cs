@@ -261,7 +261,7 @@ namespace IKVM.Reflection.Reader
 					list.Add((MethodInfo)module.ResolveMethod(module.MethodImpl.records[i].MethodDeclaration, typeArgs, null));
 				}
 			}
-			return Util.ToArray(list, Empty<MethodInfo>.Array);
+			return Util.ToArray(list, Array.Empty<MethodInfo>());
 		}
 
 		internal override int GetCurrentToken()

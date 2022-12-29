@@ -551,7 +551,7 @@ namespace IKVM.Reflection.Reader
 				rec.BuildNumber,
 				rec.RevisionNumber,
 				rec.Culture == 0 ? "neutral" : GetString(rec.Culture),
-				rec.PublicKeyOrToken == 0 ? Empty<byte>.Array : (rec.Flags & PublicKey) == 0 ? GetBlobCopy(rec.PublicKeyOrToken) : AssemblyName.ComputePublicKeyToken(GetBlobCopy(rec.PublicKeyOrToken)),
+				rec.PublicKeyOrToken == 0 ? Array.Empty<byte>() : (rec.Flags & PublicKey) == 0 ? GetBlobCopy(rec.PublicKeyOrToken) : AssemblyName.ComputePublicKeyToken(GetBlobCopy(rec.PublicKeyOrToken)),
 				rec.Flags);
 			return universe.Load(name, this, true);
 		}
@@ -764,7 +764,7 @@ namespace IKVM.Reflection.Reader
 				// for convenience, we support passing a MethodDef token as well, because in some places
 				// it makes sense to have a vararg method that is referred to by its methoddef (e.g. ldftn).
 				// Note that MethodSpec doesn't make sense, because generic methods cannot be vararg.
-				customModifiers = Empty<CustomModifiers>.Array;
+				customModifiers = Array.Empty<CustomModifiers>();
 				return Type.EmptyTypes;
 			}
 			else
@@ -1058,7 +1058,7 @@ namespace IKVM.Reflection.Reader
 				}
 				else
 				{
-					name.SetPublicKeyToken(Empty<byte>.Array);
+					name.SetPublicKeyToken(Array.Empty<byte>());
 				}
 				if (AssemblyRef.records[i].Culture != 0)
 				{

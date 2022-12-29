@@ -167,6 +167,7 @@ namespace IKVM.Internal
             {
                 throw x.ToJava();
             }
+
             // NOTE We used to remove the type from the hashtable here, but that creates a race condition if
             // another thread also fires the OnTypeResolve event while we're baking the type.
             // I really would like to remove the type from the hashtable, but at the moment I don't see
@@ -182,9 +183,8 @@ namespace IKVM.Internal
             lock (dynamicTypes)
             {
                 if (dynamicTypes.ContainsKey(name))
-                {
                     return false;
-                }
+
                 dynamicTypes.Add(name, null);
                 return true;
             }
@@ -193,9 +193,7 @@ namespace IKVM.Internal
         internal override string AllocMangledName(DynamicTypeWrapper tw)
         {
             lock (dynamicTypes)
-            {
                 return TypeNameMangleImpl(dynamicTypes, tw.Name, tw);
-            }
         }
 
         internal static string TypeNameMangleImpl(Dictionary<string, TypeWrapper> dict, string name, TypeWrapper tw)

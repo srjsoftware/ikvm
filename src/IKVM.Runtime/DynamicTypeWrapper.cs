@@ -27,6 +27,7 @@ using System.Diagnostics;
 
 using IKVM.Attributes;
 using IKVM.Runtime;
+
 using System.Linq;
 
 #if IMPORTER
@@ -48,6 +49,9 @@ using ProtectionDomain = java.security.ProtectionDomain;
 namespace IKVM.Internal
 {
 
+    /// <summary>
+    /// Represents a Java type loaded at runtime from a Java class file.
+    /// </summary>
 #if IMPORTER
     abstract class DynamicTypeWrapper : TypeWrapper
 #else
@@ -60,52 +64,37 @@ namespace IKVM.Internal
 #else
         protected readonly ClassLoaderWrapper classLoader;
 #endif
-        private volatile DynamicImpl impl;
-        private readonly TypeWrapper baseTypeWrapper;
-        private readonly TypeWrapper[] interfaces;
-        private readonly string sourceFileName;
+        volatile DynamicImpl impl;
+        readonly TypeWrapper baseTypeWrapper;
+        readonly TypeWrapper[] interfaces;
+        readonly string sourceFileName;
 #if !IMPORTER
-        private byte[][] lineNumberTables;
+        byte[][] lineNumberTables;
 #endif
-        private MethodBase automagicSerializationCtor;
+        MethodBase automagicSerializationCtor;
 
-        private TypeWrapper LoadTypeWrapper(ClassLoaderWrapper classLoader, ProtectionDomain pd, ClassFile.ConstantPoolItemClass clazz)
-        {
-            // check for patched constant pool items
-            TypeWrapper tw = clazz.GetClassType();
-            if (tw == null || tw == VerifierTypeWrapper.Null)
-            {
-                tw = classLoader.LoadClassByDottedNameFast(clazz.Name);
-            }
-            if (tw == null)
-            {
-                throw new NoClassDefFoundError(clazz.Name);
-            }
-            CheckMissing(this, tw);
-            classLoader.CheckPackageAccess(tw, pd);
-            return tw;
-        }
-
-        private static void CheckMissing(TypeWrapper prev, TypeWrapper tw)
+        /// <summary>
+        /// Checks that the given type wrapper is not an unloadable type.
+        /// </summary>
+        /// <param name="prev"></param>
+        /// <param name="tw"></param>
+        static void CheckMissing(TypeWrapper prev, TypeWrapper tw)
         {
 #if IMPORTER
             do
             {
-                UnloadableTypeWrapper missing = tw as UnloadableTypeWrapper;
-                if (missing != null)
+                if (tw is UnloadableTypeWrapper missing)
                 {
-                    Type mt = ReflectUtil.GetMissingType(missing.MissingType);
+                    var mt = ReflectUtil.GetMissingType(missing.MissingType);
                     if (mt.Assembly.__IsMissing)
-                    {
                         throw new FatalCompilerErrorException(Message.MissingBaseTypeReference, mt.FullName, mt.Assembly.FullName);
-                    }
-                    throw new FatalCompilerErrorException(Message.MissingBaseType, mt.FullName, mt.Assembly.FullName,
-                        prev.TypeAsBaseType.FullName, prev.TypeAsBaseType.Module.Name);
+
+                    throw new FatalCompilerErrorException(Message.MissingBaseType, mt.FullName, mt.Assembly.FullName, prev.TypeAsBaseType.FullName, prev.TypeAsBaseType.Module.Name);
                 }
-                foreach (TypeWrapper iface in tw.Interfaces)
-                {
+
+                foreach (var iface in tw.Interfaces)
                     CheckMissing(tw, iface);
-                }
+
                 prev = tw;
                 tw = tw.BaseTypeWrapper;
             }
@@ -113,59 +102,55 @@ namespace IKVM.Internal
 #endif
         }
 
+        /// <summary>
+        /// Initializes a new instance.
+        /// </summary>
+        /// <param name="host"></param>
+        /// <param name="f"></param>
+        /// <param name="classLoader"></param>
+        /// <param name="pd"></param>
+        /// <exception cref="VerifyError"></exception>
+        /// <exception cref="IllegalAccessError"></exception>
+        /// <exception cref="IncompatibleClassChangeError"></exception>
 #if IMPORTER
-        internal DynamicTypeWrapper(TypeWrapper host, ClassFile f, CompilerClassLoader classLoader, ProtectionDomain pd)
+        internal DynamicTypeWrapper(TypeWrapper host, ClassFile f, CompilerClassLoader classLoader, ProtectionDomain pd) :
 #else
-        internal DynamicTypeWrapper(TypeWrapper host, ClassFile f, ClassLoaderWrapper classLoader, ProtectionDomain pd)
+        internal DynamicTypeWrapper(TypeWrapper host, ClassFile f, ClassLoaderWrapper classLoader, ProtectionDomain pd) :
 #endif
-            : base(f.IsInternal ? TypeFlags.InternalAccess : host != null ? TypeFlags.Anonymous : TypeFlags.None, f.Modifiers, f.Name)
+            base(f.IsInternal ? TypeFlags.InternalAccess : host != null ? TypeFlags.Anonymous : TypeFlags.None, f.Modifiers, f.Name)
         {
-            Profiler.Count("DynamicTypeWrapper");
-            this.classLoader = classLoader;
+            this.classLoader = classLoader ?? throw new ArgumentNullException(nameof(classLoader));
             this.sourceFileName = f.SourceFileAttribute;
+
             if (f.IsInterface)
             {
                 // interfaces can't "override" final methods in object
-                foreach (ClassFile.Method method in f.Methods)
+                foreach (var method in f.Methods)
                 {
-                    MethodWrapper mw;
-                    if (method.IsVirtual
-                        && (mw = CoreClasses.java.lang.Object.Wrapper.GetMethodWrapper(method.Name, method.Signature, false)) != null
-                        && mw.IsVirtual
-                        && mw.IsFinal)
+                    if (method.IsVirtual)
                     {
-                        throw new VerifyError("class " + f.Name + " overrides final method " + method.Name + "." + method.Signature);
+                        var mw = CoreClasses.java.lang.Object.Wrapper.GetMethodWrapper(method.Name, method.Signature, false);
+                        if (mw != null && mw.IsVirtual && mw.IsFinal)
+                            throw new VerifyError($"Class {f.Name} overrides final method {method.Name}.{method.Signature}");
                     }
                 }
             }
             else
             {
                 this.baseTypeWrapper = LoadTypeWrapper(classLoader, pd, f.SuperClass);
-                if (!BaseTypeWrapper.IsAccessibleFrom(this))
-                {
+                if (BaseTypeWrapper.IsAccessibleFrom(this) == false)
                     throw new IllegalAccessError("Class " + f.Name + " cannot access its superclass " + BaseTypeWrapper.Name);
-                }
                 if (BaseTypeWrapper.IsFinal)
-                {
                     throw new VerifyError("Class " + f.Name + " extends final class " + BaseTypeWrapper.Name);
-                }
                 if (BaseTypeWrapper.IsInterface)
-                {
                     throw new IncompatibleClassChangeError("Class " + f.Name + " has interface " + BaseTypeWrapper.Name + " as superclass");
-                }
                 if (BaseTypeWrapper.TypeAsTBD == Types.Delegate)
-                {
                     throw new VerifyError(BaseTypeWrapper.Name + " cannot be used as a base class");
-                }
-                // NOTE defining value types, enums is not supported in IKVM v1
                 if (BaseTypeWrapper.TypeAsTBD == Types.ValueType || BaseTypeWrapper.TypeAsTBD == Types.Enum)
-                {
-                    throw new VerifyError("Defining value types in Java is not implemented in IKVM v1");
-                }
+                    throw new VerifyError("Defining value types in Java is not implemented in IKVM");
                 if (IsDelegate)
-                {
                     VerifyDelegate(f);
-                }
+
 #if CLASSGC
                 if (JVM.classUnloading && BaseTypeWrapper.TypeAsBaseType == typeof(ContextBoundObject))
                 {
@@ -175,32 +160,52 @@ namespace IKVM.Internal
             }
 
 #if CLASSGC
+
             if (JVM.classUnloading)
             {
                 VerifyRunAndCollect(f);
             }
+
 #endif
 
-            ClassFile.ConstantPoolItemClass[] interfaces = f.Interfaces;
+            var interfaces = f.Interfaces;
             this.interfaces = new TypeWrapper[interfaces.Length];
             for (int i = 0; i < interfaces.Length; i++)
             {
-                TypeWrapper iface = LoadTypeWrapper(classLoader, pd, interfaces[i]);
-                if (!iface.IsAccessibleFrom(this))
-                {
+                var iface = LoadTypeWrapper(classLoader, pd, interfaces[i]);
+                if (iface.IsAccessibleFrom(this) == false)
                     throw new IllegalAccessError("Class " + f.Name + " cannot access its superinterface " + iface.Name);
-                }
-                if (!iface.IsInterface)
-                {
+                if (iface.IsInterface == false)
                     throw new IncompatibleClassChangeError("Implementing class");
-                }
                 this.interfaces[i] = iface;
             }
 
             impl = new JavaTypeImpl(host, f, this);
         }
 
+        /// <summary>
+        /// Gets the <see cref="TypeWrapper"/> associated with the specified constant pool item.
+        /// </summary>
+        /// <param name="classLoader"></param>
+        /// <param name="pd"></param>
+        /// <param name="clazz"></param>
+        /// <returns></returns>
+        /// <exception cref="NoClassDefFoundError"></exception>
+        TypeWrapper LoadTypeWrapper(ClassLoaderWrapper classLoader, ProtectionDomain pd, ClassFile.ConstantPoolItemClass clazz)
+        {
+            // check for patched constant pool items
+            var tw = clazz.GetClassType();
+            if (tw == null || tw == VerifierTypeWrapper.Null)
+                tw = classLoader.LoadClassByDottedNameFast(clazz.Name);
+            if (tw == null)
+                throw new NoClassDefFoundError(clazz.Name);
+            CheckMissing(this, tw);
+            classLoader.CheckPackageAccess(tw, pd);
+            return tw;
+        }
+
 #if CLASSGC
+
         private static void VerifyRunAndCollect(ClassFile f)
         {
             if (f.Annotations != null)
@@ -244,136 +249,132 @@ namespace IKVM.Internal
                 }
             }
         }
+
 #endif
 
-        private void VerifyDelegate(ClassFile f)
+        /// <summary>
+        /// Verifies whether the given Java class file represents a valid .NET delegate type.
+        /// </summary>
+        /// <param name="f"></param>
+        /// <exception cref="VerifyError"></exception>
+        void VerifyDelegate(ClassFile f)
         {
-            if (!f.IsFinal)
-            {
-                throw new VerifyError("Delegate must be final");
-            }
+            if (f.IsFinal == false)
+                throw new VerifyError("Delegate must be final.");
+
             ClassFile.Method invoke = null;
             ClassFile.Method beginInvoke = null;
             ClassFile.Method endInvoke = null;
             ClassFile.Method constructor = null;
-            foreach (ClassFile.Method m in f.Methods)
+
+            foreach (var m in f.Methods)
             {
                 if (m.Name == "Invoke")
                 {
                     if (invoke != null)
-                    {
-                        throw new VerifyError("Delegate may only have a single Invoke method");
-                    }
+                        throw new VerifyError("Delegate may only have a single Invoke method.");
+
                     invoke = m;
                 }
                 else if (m.Name == "BeginInvoke")
                 {
                     if (beginInvoke != null)
-                    {
-                        throw new VerifyError("Delegate may only have a single BeginInvoke method");
-                    }
+                        throw new VerifyError("Delegate may only have a single BeginInvoke method.");
+
                     beginInvoke = m;
                 }
                 else if (m.Name == "EndInvoke")
                 {
                     if (endInvoke != null)
-                    {
-                        throw new VerifyError("Delegate may only have a single EndInvoke method");
-                    }
+                        throw new VerifyError("Delegate may only have a single EndInvoke method.");
+
                     endInvoke = m;
                 }
                 else if (m.Name == "<init>")
                 {
                     if (constructor != null)
-                    {
-                        throw new VerifyError("Delegate may only have a single constructor");
-                    }
+                        throw new VerifyError("Delegate may only have a single constructor.");
+
                     constructor = m;
                 }
                 else if (m.IsNative)
                 {
-                    throw new VerifyError("Delegate may not have any native methods besides Invoke, BeginInvoke and EndInvoke");
+                    throw new VerifyError("Delegate may not have any native methods besides Invoke, BeginInvoke and EndInvoke.");
                 }
             }
+
             if (invoke == null || constructor == null)
-            {
                 throw new VerifyError("Delegate must have a constructor and an Invoke method");
-            }
+
             if (!invoke.IsPublic || !invoke.IsNative || invoke.IsFinal || invoke.IsStatic)
-            {
                 throw new VerifyError("Delegate Invoke method must be a public native non-final instance method");
-            }
+
             if ((beginInvoke != null && endInvoke == null) || (beginInvoke == null && endInvoke != null))
-            {
                 throw new VerifyError("Delegate must have both BeginInvoke and EndInvoke or neither");
-            }
-            if (!constructor.IsPublic)
-            {
+
+            if (constructor.IsPublic == false)
                 throw new VerifyError("Delegate constructor must be public");
-            }
-            if (constructor.Instructions.Length < 3
-                || constructor.Instructions[0].NormalizedOpCode != NormalizedByteCode.__aload
-                || constructor.Instructions[0].NormalizedArg1 != 0
-                || constructor.Instructions[1].NormalizedOpCode != NormalizedByteCode.__invokespecial
-                || constructor.Instructions[2].NormalizedOpCode != NormalizedByteCode.__return)
-            {
+
+            if (constructor.Instructions.Length < 3 ||
+                constructor.Instructions[0].NormalizedOpCode != NormalizedByteCode.__aload ||
+                constructor.Instructions[0].NormalizedArg1 != 0 ||
+                constructor.Instructions[1].NormalizedOpCode != NormalizedByteCode.__invokespecial ||
+                constructor.Instructions[2].NormalizedOpCode != NormalizedByteCode.__return)
                 throw new VerifyError("Delegate constructor must be empty");
-            }
+
             if (f.Fields.Length != 0)
-            {
                 throw new VerifyError("Delegate may not declare any fields");
-            }
-            TypeWrapper iface = classLoader.LoadClassByDottedNameFast(f.Name + DotNetTypeWrapper.DelegateInterfaceSuffix);
+
+            var iface = classLoader.LoadClassByDottedNameFast(f.Name + DotNetTypeWrapper.DelegateInterfaceSuffix);
             DelegateInnerClassCheck(iface != null);
             DelegateInnerClassCheck(iface.IsInterface);
             DelegateInnerClassCheck(iface.IsPublic);
             DelegateInnerClassCheck(iface.GetClassLoader() == classLoader);
-            MethodWrapper[] methods = iface.GetMethods();
+
+            var methods = iface.GetMethods();
             DelegateInnerClassCheck(methods.Length == 1 && methods[0].Name == "Invoke");
             if (methods[0].Signature != invoke.Signature)
-            {
                 throw new VerifyError("Delegate Invoke method signature must be identical to inner interface Invoke method signature");
-            }
             if (iface.Interfaces.Length != 0)
-            {
                 throw new VerifyError("Delegate inner interface may not extend any interfaces");
-            }
             if (constructor.Signature != "(" + iface.SigName + ")V")
-            {
                 throw new VerifyError("Delegate constructor must take a single argument of type inner Method interface");
-            }
             if (beginInvoke != null && beginInvoke.Signature != invoke.Signature.Substring(0, invoke.Signature.IndexOf(')')) + "Lcli.System.AsyncCallback;Ljava.lang.Object;)Lcli.System.IAsyncResult;")
-            {
                 throw new VerifyError("Delegate BeginInvoke method has incorrect signature");
-            }
             if (endInvoke != null && endInvoke.Signature != "(Lcli.System.IAsyncResult;)" + invoke.Signature.Substring(invoke.Signature.IndexOf(')') + 1))
-            {
                 throw new VerifyError("Delegate EndInvoke method has incorrect signature");
-            }
         }
 
-        private static void DelegateInnerClassCheck(bool cond)
+        static void DelegateInnerClassCheck(bool cond)
         {
-            if (!cond)
-            {
+            if (cond == false)
                 throw new VerifyError("Delegate must have a public inner interface named Method with a single method named Invoke");
-            }
         }
 
-        private bool IsDelegate
+        /// <summary>
+        /// Returns <c>true</c> if this type represents a delegate type.
+        /// </summary>
+        bool IsDelegate
         {
             get
             {
-                TypeWrapper baseTypeWrapper = BaseTypeWrapper;
+                var baseTypeWrapper = BaseTypeWrapper;
                 return baseTypeWrapper != null && baseTypeWrapper.TypeAsTBD == Types.MulticastDelegate;
             }
         }
 
+        /// <summary>
+        /// Gets the base type of this type.
+        /// </summary>
         internal sealed override TypeWrapper BaseTypeWrapper
         {
             get { return baseTypeWrapper; }
         }
 
+        /// <summary>
+        /// Gets the class loader that owns this type.
+        /// </summary>
+        /// <returns></returns>
         internal override ClassLoaderWrapper GetClassLoader()
         {
             return classLoader;
@@ -4697,19 +4698,15 @@ namespace IKVM.Internal
                     {
                         foreach (object[] def in classFile.Fields[i].Annotations)
                         {
-                            Annotation annotation = Annotation.Load(wrapper, def);
+                            var annotation = Annotation.Load(wrapper, def);
                             if (annotation != null)
                             {
                                 {
-                                    DynamicPropertyFieldWrapper prop = fields[i] as DynamicPropertyFieldWrapper;
+                                    var prop = fields[i] as DynamicPropertyFieldWrapper;
                                     if (prop != null)
-                                    {
                                         annotation.Apply(wrapper.GetClassLoader(), prop.GetPropertyBuilder(), def);
-                                    }
                                     else
-                                    {
                                         annotation.Apply(wrapper.GetClassLoader(), (FieldBuilder)fields[i].GetField(), def);
-                                    }
                                 }
                             }
                         }
@@ -4748,9 +4745,7 @@ namespace IKVM.Internal
                     }
 #if !IMPORTER
                     if (liveObjects != null)
-                    {
                         typeof(IKVM.Runtime.LiveObjectHolder<>).MakeGenericType(type).GetField("values", BindingFlags.Static | BindingFlags.Public).SetValue(null, liveObjects.ToArray());
-                    }
 #endif
                 }
                 finally
@@ -4760,8 +4755,7 @@ namespace IKVM.Internal
 #if !IMPORTER
                 // When we're statically compiling we don't need to set the wrapper here, because we've already done so for the typeBuilder earlier.
                 wrapper.GetClassLoader().SetWrapperForType(type, wrapper);
-#endif
-#if IMPORTER
+#else
                 wrapper.FinishGhostStep2();
 #endif
 
@@ -4769,6 +4763,7 @@ namespace IKVM.Internal
             }
 
 #if IMPORTER
+
             private static void AddConstantPoolAttributeIfNecessary(ClassFile classFile, TypeBuilder typeBuilder)
             {
                 object[] constantPool = null;
@@ -4801,7 +4796,7 @@ namespace IKVM.Internal
                     }
                     try
                     {
-                        BigEndianBinaryReader br = new BigEndianBinaryReader(runtimeVisibleTypeAnnotations, 0, runtimeVisibleTypeAnnotations.Length);
+                        var br = new BigEndianBinaryReader(runtimeVisibleTypeAnnotations, 0, runtimeVisibleTypeAnnotations.Length);
                         ushort num_annotations = br.ReadUInt16();
                         for (int i = 0; i < num_annotations; i++)
                         {
@@ -6790,44 +6785,32 @@ namespace IKVM.Internal
 
         internal override string GetGenericMethodSignature(MethodWrapper mw)
         {
-            MethodWrapper[] methods = GetMethods();
+            var methods = GetMethods();
             for (int i = 0; i < methods.Length; i++)
-            {
                 if (methods[i] == mw)
-                {
                     return impl.GetGenericMethodSignature(i);
-                }
-            }
-            Debug.Fail("Unreachable code");
-            return null;
+
+            throw new InvalidOperationException();
         }
 
         internal override string GetGenericFieldSignature(FieldWrapper fw)
         {
-            FieldWrapper[] fields = GetFields();
+            var fields = GetFields();
             for (int i = 0; i < fields.Length; i++)
-            {
                 if (fields[i] == fw)
-                {
                     return impl.GetGenericFieldSignature(i);
-                }
-            }
-            Debug.Fail("Unreachable code");
-            return null;
+
+            throw new InvalidOperationException();
         }
 
         internal override MethodParametersEntry[] GetMethodParameters(MethodWrapper mw)
         {
-            MethodWrapper[] methods = GetMethods();
+            var methods = GetMethods();
             for (int i = 0; i < methods.Length; i++)
-            {
                 if (methods[i] == mw)
-                {
                     return impl.GetMethodParameters(i);
-                }
-            }
-            Debug.Fail("Unreachable code");
-            return null;
+
+            throw new InvalidOperationException();
         }
 
 #if !IMPORTER

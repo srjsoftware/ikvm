@@ -30,6 +30,8 @@ using System.Security.Permissions;
 using IKVM.Attributes;
 using IKVM.Runtime;
 
+using System.Runtime.CompilerServices;
+
 #if IMPORTER || EXPORTER
 using IKVM.Reflection;
 using IKVM.Reflection.Emit;
@@ -47,10 +49,13 @@ using IKVM.Tools.Importer;
 namespace IKVM.Internal
 {
 
+    /// <summary>
+    /// Represents an existing .NET type exposed to Java.
+    /// </summary>
     sealed class DotNetTypeWrapper : TypeWrapper
     {
 
-        private const string NamePrefix = "cli.";
+        const string NamePrefix = "cli.";
         internal const string DelegateInterfaceSuffix = "$Method";
         internal const string AttributeAnnotationSuffix = "$Annotation";
         internal const string AttributeAnnotationReturnValueSuffix = "$__ReturnValue";
@@ -61,12 +66,14 @@ namespace IKVM.Internal
         internal const string GenericAttributeAnnotationTypeName = "ikvm.internal.AttributeAnnotation`1";
         internal const string GenericAttributeAnnotationReturnValueTypeName = "ikvm.internal.AttributeAnnotationReturnValue`1";
         internal const string GenericAttributeAnnotationMultipleTypeName = "ikvm.internal.AttributeAnnotationMultiple`1";
-        private static readonly Dictionary<Type, TypeWrapper> types = new Dictionary<Type, TypeWrapper>();
-        private readonly Type type;
-        private TypeWrapper baseTypeWrapper;
-        private volatile TypeWrapper[] innerClasses;
-        private TypeWrapper outerClass;
-        private volatile TypeWrapper[] interfaces;
+
+        static readonly ConditionalWeakTable<Type, TypeWrapper> types = new ConditionalWeakTable<Type, TypeWrapper>();
+
+        readonly Type type;
+        TypeWrapper baseTypeWrapper;
+        volatile TypeWrapper[] innerClasses;
+        TypeWrapper outerClass;
+        volatile TypeWrapper[] interfaces;
 
         private static Modifiers GetModifiers(Type type)
         {
@@ -298,46 +305,43 @@ namespace IKVM.Internal
         // these classes to their instantiations, so we report the open generic type class instead.
         // Note also that these classes can only be used as a "handle" to the type, they expose no members,
         // don't implement any interfaces and the base class is always object.
-        private sealed class OpenGenericTypeWrapper : TypeWrapper
+        sealed class OpenGenericTypeWrapper : TypeWrapper
         {
-            private readonly Type type;
 
-            private static Modifiers GetModifiers(Type type)
+            readonly Type type;
+
+            static Modifiers GetModifiers(Type type)
             {
-                Modifiers modifiers = Modifiers.Abstract | Modifiers.Final;
+                var modifiers = Modifiers.Abstract | Modifiers.Final;
                 if (type.IsInterface)
-                {
                     modifiers |= Modifiers.Interface;
-                }
+
                 return modifiers;
             }
 
-            internal OpenGenericTypeWrapper(Type type, string name)
-                : base(TypeFlags.None, GetModifiers(type), name)
+            /// <summary>
+            /// Initializes a new instance.
+            /// </summary>
+            /// <param name="type"></param>
+            /// <param name="name"></param>
+            internal OpenGenericTypeWrapper(Type type, string name) :
+                base(TypeFlags.None, GetModifiers(type), name)
             {
                 this.type = type;
             }
 
-            internal override TypeWrapper BaseTypeWrapper
-            {
-                get { return type.IsInterface ? null : CoreClasses.java.lang.Object.Wrapper; }
-            }
+            internal override TypeWrapper BaseTypeWrapper => type.IsInterface ? null : CoreClasses.java.lang.Object.Wrapper;
 
-            internal override Type TypeAsTBD
-            {
-                get { return type; }
-            }
+            internal override Type TypeAsTBD => type;
 
-            internal override ClassLoaderWrapper GetClassLoader()
-            {
-                return AssemblyClassLoader.FromAssembly(type.Assembly);
-            }
+            internal override ClassLoaderWrapper GetClassLoader() => AssemblyClassLoader.FromAssembly(type.Assembly);
 
             protected override void LazyPublishMembers()
             {
                 SetFields(FieldWrapper.EmptyArray);
                 SetMethods(MethodWrapper.EmptyArray);
             }
+
         }
 
         internal abstract class FakeTypeWrapper : TypeWrapper
@@ -914,20 +918,17 @@ namespace IKVM.Internal
                 base.LazyPublishMembers();
             }
 
-            private static void AddMethodIfUnique(List<MethodWrapper> methods, MethodWrapper method)
+            static void AddMethodIfUnique(List<MethodWrapper> methods, MethodWrapper method)
             {
-                foreach (MethodWrapper mw in methods)
-                {
+                foreach (var mw in methods)
                     if (mw.Name == method.Name && mw.Signature == method.Signature)
-                    {
-                        // ignore duplicate
                         return;
-                    }
-                }
+
                 methods.Add(method);
             }
 
 #if !IMPORTER && !FIRST_PASS && !EXPORTER
+
             internal override object GetAnnotationDefault(MethodWrapper mw)
             {
                 if (mw.IsOptionalAttributeAnnotationValue)
@@ -1190,6 +1191,7 @@ namespace IKVM.Internal
 
                 private sealed class MultipleAnnotation : Annotation
                 {
+
                     private readonly AttributeAnnotationTypeWrapper type;
 
                     internal MultipleAnnotation(AttributeAnnotationTypeWrapper type)
@@ -1618,13 +1620,7 @@ namespace IKVM.Internal
                 }
             }
 
-            internal override Annotation Annotation
-            {
-                get
-                {
-                    return new AttributeAnnotation(attributeType);
-                }
-            }
+            internal override Annotation Annotation => new AttributeAnnotation(attributeType);
 
             internal override AttributeTargets AttributeTargets
             {
@@ -1632,20 +1628,14 @@ namespace IKVM.Internal
             }
         }
 
+        /// <summary>
+        /// Gets the <see cref="TypeWrapper"/> instance associated with the given <see cref="Type"/>.
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
         internal static TypeWrapper GetWrapperFromDotNetType(Type type)
         {
-            TypeWrapper tw;
-            lock (types)
-                types.TryGetValue(type, out tw);
-
-            if (tw == null)
-            {
-                tw = AssemblyClassLoader.FromAssembly(type.Assembly).GetWrapperFromAssemblyType(type);
-                lock (types)
-                    types[type] = tw;
-            }
-
-            return tw;
+            return types.GetValue(type, _ => AssemblyClassLoader.FromAssembly(type.Assembly).GetWrapperFromAssemblyType(type));
         }
 
         private static TypeWrapper GetBaseTypeWrapper(Type type)
@@ -1663,6 +1653,7 @@ namespace IKVM.Internal
                 {
                     return CoreClasses.java.lang.Object.Wrapper;
                 }
+
                 return ClassLoaderWrapper.GetWrapperFromType(type);
             }
             else if (ClassLoaderWrapper.IsRemappedType(type.BaseType))
@@ -1678,13 +1669,9 @@ namespace IKVM.Internal
         internal static TypeWrapper Create(Type type, string name)
         {
             if (type.ContainsGenericParameters)
-            {
                 return new OpenGenericTypeWrapper(type, name);
-            }
             else
-            {
                 return new DotNetTypeWrapper(type, name);
-            }
         }
 
         private DotNetTypeWrapper(Type type, string name)
