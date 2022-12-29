@@ -1,4 +1,6 @@
-﻿using IKVM.Internal;
+﻿using ikvm.@internal;
+
+using IKVM.Internal;
 
 using java.lang.reflect;
 
@@ -41,6 +43,7 @@ namespace IKVM.Java.Externs.sun.reflect
             if (mw.DeclaringType.IsInterface)
                 mw.DeclaringType.RunClassInit();
 
+            CallerID.getCallerID();
             if (mw.HasCallerID)
                 args = ArrayUtil.Concat(args, callerID);
 
