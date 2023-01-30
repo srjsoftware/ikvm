@@ -5,17 +5,17 @@ import java.security.*;
 
 import sun.security.action.*;
 
-public class DefaultSelectorProvider {
+public class DefaultAsynchronousChannelProvider {
 
-    private DefaultSelectorProvider() {
+    private DefaultAsynchronousChannelProvider() {
         
     }
 
     @SuppressWarnings("unchecked")
-    private static SelectorProvider createProvider(String cn) {
-        Class<SelectorProvider> c;
+    private static AsynchronousChannelProvider createProvider(String cn) {
+        Class<AsynchronousChannelProvider> c;
         try {
-            c = (Class<SelectorProvider>)Class.forName(cn);
+            c = (Class<AsynchronousChannelProvider>)Class.forName(cn);
         } catch (ClassNotFoundException x) {
             throw new AssertionError(x);
         }
@@ -24,17 +24,18 @@ public class DefaultSelectorProvider {
         } catch (IllegalAccessException | InstantiationException x) {
             throw new AssertionError(x);
         }
+
     }
 
-    public static SelectorProvider create() {
+    public static AsynchronousChannelProvider create() {
         if (cli.IKVM.Runtime.RuntimeUtil.get_IsWindows()) {
-            return createProvider("sun.nio.ch.WindowsSelectorProvider");
+            return createProvider("sun.nio.ch.WindowsAsynchronousChannelProvider");
         } else {
             String osname = AccessController.doPrivileged(new GetPropertyAction("os.name"));
             if (osname.equals("Linux"))
-                return createProvider("sun.nio.ch.LinuxSelectorProvider");
+                return createProvider("sun.nio.ch.LinuxAsynchronousChannelProvider");
             if (osname.contains("OS X"))
-                return createProvider("sun.nio.ch.BsdSelectorProvider");
+                return createProvider("sun.nio.ch.BsdAsynchronousChannelProvider");
         }
         
         throw new AssertionError("Platform not recognized");

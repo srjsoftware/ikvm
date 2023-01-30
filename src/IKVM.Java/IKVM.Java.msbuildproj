@@ -44,7 +44,7 @@
         <None Include="icedtea_rt\**\*" />
         <None Include="local\**\*" />
         <None Include="@(OpenJdkSource)">
-            <LinkBase>openjdk\$([MSBuild]::MakeRelative('$(OpenJdkDir)', '%(RootDir)%(Directory)'))</LinkBase>
+            <Link>openjdk\$([MSBuild]::MakeRelative('$(OpenJdkDir)', '%(RootDir)%(Directory)%(Filename)%(Extension)'))</Link>
         </None>
         <Compile Include="@(OpenJdkSource)" />
         <JavaResource Include="@(OpenJdkResource)" LinkBase="openjdk" />

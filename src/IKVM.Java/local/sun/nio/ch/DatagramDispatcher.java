@@ -1,8 +1,10 @@
 package sun.nio.ch;
 
 import java.io.*;
+import java.net.*;
 
-class SocketDispatcher extends NativeDispatcher {
+class DatagramDispatcher extends NativeDispatcher
+{
 
     private static native int read0(FileDescriptor fd, long address, int len) throws IOException;
 
@@ -32,12 +34,12 @@ class SocketDispatcher extends NativeDispatcher {
         return writev0(fd, address, len);
     }
 
-    void preClose(FileDescriptor fd) throws IOException {
-        preClose0(fd);
-    }
-
     void close(FileDescriptor fd) throws IOException {
         close0(fd);
+    }
+
+    void preClose(FileDescriptor fd) throws IOException {
+        preClose0(fd);
     }
 
 }
